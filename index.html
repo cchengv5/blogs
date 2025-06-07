@@ -25,13 +25,15 @@
                     <p>当前没有主题，请点击"添加主题"按钮创建新主题</p>
                 </div>
             </div>
-            <button onclick="addTextArea()" class="add-btn">
+            <button onclick="topicPresenter.addNewTopic()" class="add-btn">
                 <i class="material-icons">add</i> 添加主题
             </button>
             <div class="button-container">
-                <button onclick="exportToSVG()">
-                    <i class="material-icons" style="margin-right:8px">download</i>
-                    导出SVG
+                <button class="refresh-btn" onclick="topicList.refreshCurrentTopic(this)">
+                    <i class="material-icons">refresh</i>
+                </button>
+                <i class="material-icons" style="margin-right:8px">download</i>
+                导出SVG
                 </button>
             </div>
         </div>
@@ -44,12 +46,12 @@
 
 <script>
 
-
     document.addEventListener('DOMContentLoaded', function () {
         const container = document.getElementById('container');
         const input = document.getElementById('input');
         const network = document.getElementById('network');
         const splitter = document.querySelector('.splitter');
+
 
         // 从localStorage读取splitter位置
         const savedSplitterPosition = localStorage.getItem('splitterPosition');
@@ -92,6 +94,6 @@
         });
 
         // 加载所有主题
-        loadAllTopics();
+        topicPresenter.init();
     });
 </script>
