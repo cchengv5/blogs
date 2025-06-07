@@ -260,11 +260,11 @@ function applyPhysicsSettings() {
     visNetwork.setOptions({ physics: settings });
 }
 
-function updateGraph() {
+function updateGraph(text) {
+    console.log("updateGraph text=", text)
     myNodes.clear(); // 清空节点
     myEdges.clear(); // 清空边
 
-    const text = document.getElementById('textArea').value;
     // 保存当前输入
     saveToStorage(text);
     const lines = text.split('\n').filter(line => line.trim());

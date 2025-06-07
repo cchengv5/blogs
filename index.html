@@ -19,7 +19,14 @@
     <h1>概念地图</h1>
     <div id="container">
         <div id="input">
-            <textarea id="textArea" placeholder="输入关系，每行一个"></textarea>
+            <div id="textAreaContainer">
+                <div id="emptyTextAreaPrompt" class="empty-prompt">
+                    <p>当前没有主题，请点击"添加主题"按钮创建新主题</p>
+                </div>
+            </div>
+            <button onclick="addTextArea()" class="add-btn">
+                <i class="material-icons">add</i> 添加主题
+            </button>
             <div class="button-container">
                 <button onclick="updateGraph()">
                     <i class="material-icons" style="margin-right:8px">refresh</i>
@@ -43,6 +50,129 @@
 </html>
 
 <script>
+    let activeTextArea = document.querySelector('.text-area.active');
+
+    function toggleEmptyPrompt(show) {
+    const prompt = document.getElementById('emptyTextAreaPrompt');
+    if (prompt) {
+        prompt.style.display = show ? 'block' : 'none';
+    }
+}
+
+    // 保存所有主题内容
+    function saveAllTopics() {
+        const topics = [];
+        document.querySelectorAll('.text-area-item').forEach((item, index) => {
+            const textarea = item.querySelector('.text-area');
+            const header = item.querySelector('.text-area-header span').textContent;
+            topics.push({
+                id: index,
+                header: header,
+                content: textarea.value,
+                isActive: textarea.classList.contains('active')
+            });
+        });
+        localStorage.setItem('allTopics', JSON.stringify(topics));
+    }
+
+    // 加载所有主题
+    function createTextAreaItem(header, content = '', isActive = false) {
+        const newItem = document.createElement('div');
+        newItem.className = 'text-area-item';
+        newItem.innerHTML = `
+            <div class="text-area-header">
+                <span>${header}</span>
+                <div class="header-actions">
+                    <button class="refresh-btn" onclick="refreshCurrentTextArea(this)">
+                        <i class="material-icons">refresh</i>
+                    </button>
+                    <button class="delete-btn" onclick="removeTextArea(this)">×</button>
+                </div>
+            </div>
+            <textarea class="text-area" placeholder="输入关系，每行一个">${content}</textarea>
+        `;
+        
+        const textarea = newItem.querySelector('.text-area');
+        if (isActive) {
+            setActiveTextArea(textarea);
+        }
+        
+        newItem.querySelector('.text-area-header').addEventListener('click', function() {
+            setActiveTextArea(this.nextElementSibling);
+        });
+        
+        return newItem;
+    }
+
+    function loadAllTopics() {
+        const savedTopics = localStorage.getItem('allTopics');
+        if (!savedTopics) {
+            toggleEmptyPrompt(true);
+            return;
+        }
+
+        const topics = JSON.parse(savedTopics);
+
+        // 先清空现有主题
+        document.querySelectorAll('.text-area-item').forEach(item => item.remove());
+
+        // 重新创建所有主题
+        topics.forEach(topic => {
+            const newItem = createTextAreaItem(topic.header, topic.content || '', topic.isActive);
+            document.getElementById('textAreaContainer').appendChild(newItem);
+            toggleEmptyPrompt(false)
+        });
+
+        // 如果没有主题，显示提示
+        if (topics.length === 0) {
+            toggleEmptyPrompt(true)
+        }
+    }
+
+    function addTextArea() {
+        toggleEmptyPrompt(false);
+
+        const count = document.querySelectorAll('.text-area-item').length + 1;
+        const newItem = createTextAreaItem(`主题${count}`);
+        document.getElementById('textAreaContainer').appendChild(newItem);
+
+        // 保存所有主题内容
+        saveAllTopics();
+    }
+
+    function removeTextArea(btn) {
+        const item = btn.closest('.text-area-item');
+        if (item.querySelector('.text-area') === activeTextArea) {
+            const firstTextArea = document.querySelector('.text-area');
+            setActiveTextArea(firstTextArea);
+        }
+        item.remove();
+
+        if (document.querySelectorAll('.text-area-item').length === 0) {
+            toggleEmptyPrompt(true);
+        }
+
+        // 保存所有主题内容
+        saveAllTopics();
+    }
+
+    function setActiveTextArea(textarea) {
+        // 移除所有active状态
+        document.querySelectorAll('.text-area').forEach(ta => {
+            ta.classList.remove('active');
+            ta.style.height = '200px'; // 默认高度
+        });
+
+        // 设置新的active状态
+        textarea.classList.add('active');
+        textarea.style.height = 'calc(100vh - 200px)'; // 撑满容器
+        activeTextArea = textarea;
+
+        // 滚动到可见区域
+        textarea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        updateGraph(activeTextArea.value);
+    }
+
     function loadFromFile() {
         const input = document.createElement('input');
         input.type = 'file';
@@ -61,7 +191,7 @@
         input.click();
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         const container = document.getElementById('container');
         const input = document.getElementById('input');
         const network = document.getElementById('network');
@@ -69,7 +199,7 @@
 
         // 从localStorage读取splitter位置
         const savedSplitterPosition = localStorage.getItem('splitterPosition');
-        if(savedSplitterPosition) {
+        if (savedSplitterPosition) {
             const position = parseInt(savedSplitterPosition);
             input.style.width = position + 'px';
             network.style.width = (container.offsetWidth - position - 5) + 'px';
@@ -78,52 +208,36 @@
 
         let isDragging = false;
 
-        splitter.addEventListener('mousedown', function(e) {
+        splitter.addEventListener('mousedown', function (e) {
             isDragging = true;
             document.body.style.cursor = 'col-resize';
             e.preventDefault();
         });
 
-        document.addEventListener('mousemove', function(e) {
+        document.addEventListener('mousemove', function (e) {
             if (!isDragging) return;
-            
+
             const containerRect = container.getBoundingClientRect();
             const newInputWidth = e.clientX - containerRect.left;
             const containerWidth = containerRect.width;
-            
+
             // 确保最小宽度
             const inputWidth = Math.max(100, Math.min(newInputWidth, containerWidth - 100));
-            
+
             input.style.width = inputWidth + 'px';
             network.style.width = (containerWidth - inputWidth - 5) + 'px';
             splitter.style.left = inputWidth + 'px';
-            
+
             // 保存splitter位置到localStorage
             localStorage.setItem('splitterPosition', inputWidth.toString());
         });
 
-        document.addEventListener('mouseup', function() {
+        document.addEventListener('mouseup', function () {
             isDragging = false;
             document.body.style.cursor = '';
         });
-    });
 
-    // 在DOM加载完成后添加加载保存内容的逻辑
-    document.addEventListener('DOMContentLoaded', function () {
-        const savedData = loadFromStorage();
-        if (savedData) {
-            document.getElementById('textArea').value = savedData;
-        }
-
-        // 添加输入监听器
-        const textArea = document.getElementById('textArea');
-        let debounceTimer;
-        textArea.addEventListener('input', function () {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(updateGraph, 500); // 500ms防抖延迟
-        });
-
-        updateGraph();
+        // 加载所有主题
+        loadAllTopics();
     });
 </script>
-
