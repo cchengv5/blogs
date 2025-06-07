@@ -2,226 +2,107 @@
 <html>
 
 <head>
+
     <title>概念地图</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <script type="module">
-        import { 
-            updateGraph,
-            applyPhysicsSettings
-        } from './graph.js';
-        
-        // 保留其他全局变量和初始化代码
-        var myNodes = new Map();
-        var myEdges = new Map();
-        let currentFilePath = null;
-        let visNetwork;
-
+    <script src="graphic.js">
         // 更新按钮事件
         document.getElementById('updateBtn').onclick = updateGraph;
         document.getElementById('applyPhysicsBtn').onclick = applyPhysicsSettings;
     </script>
-    <style>
-        #container {
-            display: flex;
-            height: 100vh;
-            position: relative;
-            overflow: hidden;
-            /* 添加这行防止内容溢出 */
-        }
-
-        #input {
-            width: 400px;
-            min-width: 400px;
-            height: 100vh;
-            /* 改为100vh高度 */
-            padding: 10px;
-            display: flex;
-            flex-direction: column;
-            box-sizing: border-box;
-        }
-
-        #textArea {
-            width: 100%;
-            height: calc(100vh - 60px);
-            /* 减去按钮和padding的高度 */
-            margin-bottom: 15px;
-            padding: 12px;
-            font-size: 14px;
-            line-height: 1.5;
-            border: 1px solid #ced4da;
-            border-radius: 6px;
-            resize: vertical;
-            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-
-        #physics-panel {
-            width: 300px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-left: 1px solid #ddd;
-            overflow-y: auto;
-        }
-
-        .physics-section {
-            margin-bottom: 20px;
-            padding: 10px;
-            background: #f0f0f0;
-            border-bottom: 1px solid #ddd;
-            display: flex;
-            gap: 10px;
-        }
-        .physics-section button {
-            padding: 5px 10px;
-            background: #fff;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            cursor: pointer;
-        }
-        .physics-section button:hover {
-            background: #e0e0e0;
-        }
-        
-        /* 添加菜单样式 */
-        .menu {
-            position: relative;
-            display: inline-block;
-        }
-        .menu-btn {
-            padding: 8px 16px;
-            background-color: #f1f1f1;
-            border: none;
-            cursor: pointer;
-        }
-        .menu-content {
-            display: none;
-            position: absolute;
-            background-color: #f9f9f9;
-            min-width: 160px;
-            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-            z-index: 1;
-        }
-        .menu-content a {
-            color: black;
-            padding: 12px 16px;
-            text-decoration: none;
-            display: block;
-        }
-        .menu-content a:hover {
-            background-color: #ddd;
-        }
-        .menu:hover .menu-content {
-            display: block;
-        }
-        .menu:hover .menu-btn {
-            background-color: #ddd;
-        }
-        .splitter {
-            width: 5px;
-            background: #ddd;
-            cursor: col-resize;
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 400px;
-            z-index: 10;
-            user-select: none;
-            /* 防止拖拽时选中文本 */
-        }
-    </style>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
-    <div id="menu-bar">
-        <div class="menu">
-            <button class="menu-btn">File</button>
-            <div class="menu-content">
-                <a href="#" onclick="loadFromFile()">从文件加载</a>
-            </div>
-        </div>
-    </div>
+    <h1>概念地图</h1>
     <div id="container">
         <div id="input">
             <textarea id="textArea" placeholder="输入关系，每行一个"></textarea>
-            <button onclick="updateGraph()">更新图形</button>
+            <div class="button-container">
+                <button onclick="updateGraph()">
+                    <i class="material-icons" style="margin-right:8px">refresh</i>
+                    更新图形
+                </button>
+                <button onclick="loadFromFile()">
+                    <i class="material-icons" style="margin-right:8px">folder_open</i>
+                    从文件加载
+                </button>
+                <button onclick="exportToSVG()">
+                    <i class="material-icons" style="margin-right:8px">download</i>
+                    导出SVG
+                </button>
+            </div>
         </div>
+        <div class="splitter"></div>
         <div id="network"></div>
-        <!-- <div id="physics-panel">
-            <div class="physics-section">
-                <h3>核心物理引擎设置</h3>
-                <div class="control-item">
-                    <label>启用物理模拟: <input type="checkbox" id="physicsEnabled" checked></label>
-                </div>
-                <div class="control-item">
-                    <label>求解器类型:
-                        <select id="physicsSolver">
-                            <option value="barnesHut">Barnes-Hut</option>
-                            <option value="repulsion">Repulsion</option>
-                            <option value="forceAtlas2Based">ForceAtlas2</option>
-                        </select>
-                    </label>
-                </div>
-            </div>
-            <div class="physics-section" id="barnesHutParams">
-                <h3>Barnes-Hut参数</h3>
-                <div class="control-item">
-                    <label>引力常数: <input type="range" id="bhGravitationalConstant" min="-5000" max="5000"
-                            value="-2000"></label>
-                    <span id="bhGravitationalConstantValue">-2000</span>
-                </div>
-            </div>
-            <button onclick="applyPhysicsSettings()">应用物理设置</button>
-        </div> -->
     </div>
-
-    <script>
-        var myNodes = new Map(); // 存储节点的Map，key为节点ID，value为节点对象
-        var myEdges = new Map(); // 存储边的Map，key为边的ID，value为边对象
-
-        function loadFromFile() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.txt';
-            input.onchange = e => {
-                const file = e.target.files[0];
-                currentFilePath = file.path; // 保存文件路径
-                console.log("currentFilePath=", file.path);
-                const reader = new FileReader();
-                reader.onload = event => {
-                    document.getElementById('textArea').value = event.target.result;
-                    updateGraph();
-                };
-                reader.readAsText(file);
-            };
-            input.click();
-        }
-    </script>
 </body>
 
 </html>
 
 <script>
-    // 添加拖拽分隔栏功能
-    document.addEventListener('DOMContentLoaded', function () {
-        const splitter = document.createElement('div');
-        splitter.className = 'splitter';
-        document.getElementById('container').appendChild(splitter);
+    function loadFromFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.txt';
+        input.onchange = e => {
+            const file = e.target.files[0];
+            currentFilePath = file.path; // 保存文件路径
+            console.log("currentFilePath=", file.path);
+            const reader = new FileReader();
+            reader.onload = event => {
+                document.getElementById('textArea').value = event.target.result;
+                updateGraph();
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const container = document.getElementById('container');
+        const input = document.getElementById('input');
+        const network = document.getElementById('network');
+        const splitter = document.querySelector('.splitter');
+
+        // 从localStorage读取splitter位置
+        const savedSplitterPosition = localStorage.getItem('splitterPosition');
+        if(savedSplitterPosition) {
+            const position = parseInt(savedSplitterPosition);
+            input.style.width = position + 'px';
+            network.style.width = (container.offsetWidth - position - 5) + 'px';
+            splitter.style.left = position + 'px';
+        }
 
         let isDragging = false;
-        splitter.addEventListener('mousedown', function (e) {
+
+        splitter.addEventListener('mousedown', function(e) {
             isDragging = true;
             document.body.style.cursor = 'col-resize';
+            e.preventDefault();
         });
 
-        document.addEventListener('mousemove', function (e) {
+        document.addEventListener('mousemove', function(e) {
             if (!isDragging) return;
-            const container = document.getElementById('container');
-            const input = document.getElementById('input');
-            const newWidth = e.clientX - container.getBoundingClientRect().left;
-            input.style.width = newWidth + 'px';
-            splitter.style.left = newWidth + 'px';
+            
+            const containerRect = container.getBoundingClientRect();
+            const newInputWidth = e.clientX - containerRect.left;
+            const containerWidth = containerRect.width;
+            
+            // 确保最小宽度
+            const inputWidth = Math.max(100, Math.min(newInputWidth, containerWidth - 100));
+            
+            input.style.width = inputWidth + 'px';
+            network.style.width = (containerWidth - inputWidth - 5) + 'px';
+            splitter.style.left = inputWidth + 'px';
+            
+            // 保存splitter位置到localStorage
+            localStorage.setItem('splitterPosition', inputWidth.toString());
         });
 
-        document.addEventListener('mouseup', function () {
+        document.addEventListener('mouseup', function() {
             isDragging = false;
             document.body.style.cursor = '';
         });
@@ -229,20 +110,20 @@
 
     // 在DOM加载完成后添加加载保存内容的逻辑
     document.addEventListener('DOMContentLoaded', function () {
-            const savedData = loadFromStorage();
-            if (savedData) {
-                document.getElementById('textArea').value = savedData;
-            }
+        const savedData = loadFromStorage();
+        if (savedData) {
+            document.getElementById('textArea').value = savedData;
+        }
 
-            // 添加输入监听器
-            const textArea = document.getElementById('textArea');
-            let debounceTimer;
-            textArea.addEventListener('input', function () {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(updateGraph, 500); // 500ms防抖延迟
-            });
-
-            updateGraph();
+        // 添加输入监听器
+        const textArea = document.getElementById('textArea');
+        let debounceTimer;
+        textArea.addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(updateGraph, 500); // 500ms防抖延迟
         });
+
+        updateGraph();
+    });
 </script>
 

@@ -1,4 +1,4 @@
- // 在脚本开始部分添加边样式配置对象
+// 在脚本开始部分添加边样式配置对象
  const edgeStyles = {
     default: {
         arrows: {
@@ -178,6 +178,11 @@ class MyEdge {
 }
 
 
+// 保留其他全局变量和初始化代码
+var myNodes = new Map();
+var myEdges = new Map();
+let visNetwork;
+
 // 添加节点
 function addNode(id, label) {
     if (!myNodes.has(id)) {
@@ -235,11 +240,11 @@ function saveToStorage(data) {
 }
 
 // 从localStorage加载数据
-export function loadFromStorage() {
+function loadFromStorage() {
     return localStorage.getItem('conceptMapData') || '';
 }
 
-export function applyPhysicsSettings() {
+function applyPhysicsSettings() {
     if (!visNetwork) return;
 
     const settings = {
@@ -255,7 +260,7 @@ export function applyPhysicsSettings() {
     visNetwork.setOptions({ physics: settings });
 }
 
-export function updateGraph() {
+function updateGraph() {
     myNodes.clear(); // 清空节点
     myEdges.clear(); // 清空边
 
@@ -276,8 +281,13 @@ export function updateGraph() {
 
         // 初始化节点和边
         addNode(relation.from, relation.from); // 添加from节点
-        if (relation.to) addNode(relation.to, relation.to); // 添加to节点
-        if (relation.to) addEdge(relation.from, relation.to, relation.reason || '', relation.isArrow); // 添加边
+        if (relation.to) {
+            // to可能是多个节点，用逗号分隔
+            relation.to.split(',').forEach(subToNode => {
+                addNode(subToNode.trim(), subToNode.trim()); // 添加to节点
+                addEdge(relation.from, subToNode.trim(), relation.reason || '', relation.isArrow); // 添加边
+            });
+        }
     });
 
 
@@ -435,15 +445,55 @@ export function updateGraph() {
     }
 }
 
-// 导出功能
-export {
-    edgeStyles,
-    nodeStyles,
-    MyNode,
-    MyEdge,
-    addNode,
-    addEdge,
-    parseRelation,
-    updateGraph,
-    applyPhysicsSettings
-};
+// // 导出功能
+// export {
+//     edgeStyles,
+//     nodeStyles,
+//     MyNode,
+//     MyEdge,
+//     addNode,
+//     addEdge,
+//     parseRelation,
+//     updateGraph
+// };
+
+
+function exportToSVG() {
+    if (!visNetwork) return;
+    
+    // 获取网络容器
+    const container = document.getElementById('network');
+    
+    // 创建SVG元素
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", container.offsetWidth);
+    svg.setAttribute("height", container.offsetHeight);
+    svg.setAttribute("viewBox", `0 0 ${container.offsetWidth} ${container.offsetHeight}`);
+    
+    // 将canvas内容转换为SVG
+    const canvas = container.querySelector('canvas');
+    if (canvas) {
+        const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
+        img.setAttribute("width", container.offsetWidth);
+        img.setAttribute("height", container.offsetHeight);
+        img.setAttribute("href", canvas.toDataURL("image/png"));
+        svg.appendChild(img);
+    }
+    
+    // 创建下载链接
+    const serializer = new XMLSerializer();
+    const svgStr = serializer.serializeToString(svg);
+    const blob = new Blob([svgStr], {type: "image/svg+xml"});
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "concept-map.svg";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// 将函数添加到全局作用域
+window.exportToSVG = exportToSVG;
