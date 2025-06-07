@@ -28,14 +28,6 @@
                 <i class="material-icons">add</i> 添加主题
             </button>
             <div class="button-container">
-                <button onclick="updateGraph()">
-                    <i class="material-icons" style="margin-right:8px">refresh</i>
-                    更新图形
-                </button>
-                <button onclick="loadFromFile()">
-                    <i class="material-icons" style="margin-right:8px">folder_open</i>
-                    从文件加载
-                </button>
                 <button onclick="exportToSVG()">
                     <i class="material-icons" style="margin-right:8px">download</i>
                     导出SVG
@@ -53,11 +45,11 @@
     let activeTextArea = document.querySelector('.text-area.active');
 
     function toggleEmptyPrompt(show) {
-    const prompt = document.getElementById('emptyTextAreaPrompt');
-    if (prompt) {
-        prompt.style.display = show ? 'block' : 'none';
+        const prompt = document.getElementById('emptyTextAreaPrompt');
+        if (prompt) {
+            prompt.style.display = show ? 'block' : 'none';
+        }
     }
-}
 
     // 保存所有主题内容
     function saveAllTopics() {
@@ -77,12 +69,21 @@
 
     // 加载所有主题
     function createTextAreaItem(header, content = '', isActive = false) {
+        if (content.startsWith('#')) {
+            const firstLine = content.split('\n')[0];
+            header = firstLine.substring(1).trim();
+            content = content.substring(firstLine.length).trim();
+        }
+
         const newItem = document.createElement('div');
         newItem.className = 'text-area-item';
         newItem.innerHTML = `
             <div class="text-area-header">
                 <span>${header}</span>
                 <div class="header-actions">
+                    <button class="export-btn" onclick="exportToSVG()">
+                        <i class="material-icons">download</i>
+                    </button>
                     <button class="refresh-btn" onclick="refreshCurrentTextArea(this)">
                         <i class="material-icons">refresh</i>
                     </button>
@@ -91,16 +92,21 @@
             </div>
             <textarea class="text-area" placeholder="输入关系，每行一个">${content}</textarea>
         `;
-        
+
         const textarea = newItem.querySelector('.text-area');
+        textarea.addEventListener('input', function () {
+            if (this === activeTextArea) {
+                updateGraph(this.value);
+            }
+        });
         if (isActive) {
             setActiveTextArea(textarea);
         }
-        
-        newItem.querySelector('.text-area-header').addEventListener('click', function() {
+
+        newItem.querySelector('.text-area-header').addEventListener('click', function () {
             setActiveTextArea(this.nextElementSibling);
         });
-        
+
         return newItem;
     }
 
@@ -171,24 +177,6 @@
         // 滚动到可见区域
         textarea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         updateGraph(activeTextArea.value);
-    }
-
-    function loadFromFile() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.txt';
-        input.onchange = e => {
-            const file = e.target.files[0];
-            currentFilePath = file.path; // 保存文件路径
-            console.log("currentFilePath=", file.path);
-            const reader = new FileReader();
-            reader.onload = event => {
-                document.getElementById('textArea').value = event.target.result;
-                updateGraph();
-            };
-            reader.readAsText(file);
-        };
-        input.click();
     }
 
     document.addEventListener('DOMContentLoaded', function () {

@@ -138,7 +138,7 @@ h1 {
         gap: 8px;
     }
     
-    .refresh-btn {
+    .export-btn {
         background: none;
         border: none;
         cursor: pointer;
@@ -149,7 +149,7 @@ h1 {
         align-items: center;
     }
     
-    .refresh-btn:hover {
+    .export-btn:hover {
         color: var(--mdc-primary);
     }
 }

@@ -234,10 +234,6 @@ function parseRelation(line) {
     return retData; // 返回解析后的关系对象，或者 null 表示解析失败或不匹配的 forma
 }
 
-// 保存数据到localStorage
-function saveToStorage(data) {
-    localStorage.setItem('conceptMapData', data);
-}
 
 // 从localStorage加载数据
 function loadFromStorage() {
@@ -261,13 +257,10 @@ function applyPhysicsSettings() {
 }
 
 function updateGraph(text) {
-    console.log("updateGraph text=", text)
+    // 过滤掉以#开头的行
+    const lines = text.split('\n').filter(line => !line.startsWith('#'));
     myNodes.clear(); // 清空节点
     myEdges.clear(); // 清空边
-
-    // 保存当前输入
-    saveToStorage(text);
-    const lines = text.split('\n').filter(line => line.trim());
 
     // 节点
     const nodeMap = new Map();
