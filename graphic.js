@@ -235,28 +235,6 @@ function parseRelation(line) {
     return retData; // 返回解析后的关系对象，或者 null 表示解析失败或不匹配的 forma
 }
 
-
-// 从localStorage加载数据
-function loadFromStorage() {
-    return localStorage.getItem('conceptMapData') || '';
-}
-
-function applyPhysicsSettings() {
-    if (!visNetwork) return;
-
-    const settings = {
-        enabled: document.getElementById('physicsEnabled').checked,
-        solver: document.getElementById('physicsSolver').value,
-        barnesHut: {
-            gravitationalConstant: parseInt(document.getElementById('bhGravitationalConstant').value),
-            // 其他Barnes-Hut参数...
-        },
-        // 其他求解器参数...
-    };
-
-    visNetwork.setOptions({ physics: settings });
-}
-
 function updateGraph(text) {
     // 过滤掉以#开头的行
     const lines = text.split('\n').filter(line => !line.startsWith('#'));
