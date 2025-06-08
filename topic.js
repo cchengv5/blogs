@@ -174,6 +174,7 @@ class TopicPresenter {
         textarea.addEventListener('input', () => {
             topic.update(textarea.value); // 自动触发Proxy更新
             updateGraph(topic.getContent());
+            console.log("主题内容更新：", topic.getContent() || "无内容")
             this.topicList.save()
         });
 
@@ -269,6 +270,7 @@ class TopicPresenter {
             savedTopics.forEach(topicData => {
                 const topic = new Topic(topicData.header, topicData.content, topicData.isActive);
                 topic.id = topicData.id;
+                this.topicList.topics.set(topic.id, topic);
                 const element = this.createTopicElement(topic);
                 this.appendToContainer(element);
                 if (topicData.isActive) {
