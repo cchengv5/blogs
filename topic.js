@@ -158,12 +158,21 @@ class TopicPresenter {
 
     removeTextArea(btn) {
         const item = btn.closest('.text-area-item');
-        if (item.querySelector('.text-area') === this.activeTextArea) {
+        const textarea = item.querySelector('.text-area');
+        
+        // 找到对应的Topic对象并移除
+        const header = item.querySelector('.text-area-header span').textContent;
+        const topicToRemove = this.topicList.topics.find(t => t.header === header);
+        if (topicToRemove) {
+            this.topicList.remove(topicToRemove);
+        }
+    
+        if (textarea === this.activeTextArea) {
             const firstTextArea = document.querySelector('.text-area');
             this.setActiveTextArea(firstTextArea);
         }
         item.remove();
-
+    
         if (document.querySelectorAll('.text-area-item').length === 0) {
             this.toggleEmptyPrompt(true);
         }
@@ -212,6 +221,7 @@ class TopicPresenter {
                 const element = this.createTopicElement(topic.header, topic.content);
                 this.appendToContainer(element);
             });
+            this.toggleEmptyPrompt(false);
         }
     }
 
