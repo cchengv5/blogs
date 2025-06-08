@@ -54,10 +54,11 @@ const nodeStyles = {
         font: {
             size: 14
         },
-        color: {
-            background: 'white',
-            border: '#2B7CE9'
-        },
+        // 删除下面重复的color定义
+        // color: {
+        //    background: 'white',
+        //    border: '#2B7CE9'
+        // },
         shadow: {
             enabled: true,
         },
@@ -364,10 +365,6 @@ function updateGraph(text) {
         });
     });
 
-    nodes.forEach(node => {
-        console.log("node=", node)
-    })
-
     // 创建网络
     const container = document.getElementById('network');
     const data = { nodes, edges };
@@ -437,19 +434,6 @@ function updateGraph(text) {
         visNetwork.setData({ nodes, edges });
     }
 }
-
-// // 导出功能
-// export {
-//     edgeStyles,
-//     nodeStyles,
-//     MyNode,
-//     MyEdge,
-//     addNode,
-//     addEdge,
-//     parseRelation,
-//     updateGraph
-// };
-
 
 function exportToSVG() {
     if (!visNetwork) return;
