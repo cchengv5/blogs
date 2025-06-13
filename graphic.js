@@ -86,265 +86,290 @@ const nodeStyles = {
 
 // 节点
 class MyNode {
-    relationIn = new Map(); // 入边
-    relationOut = new Map(); // 出边
-
-    constructor(id, label) {
+    constructor(id, label, style = nodeStyles.default) {
         this.id = id;
         this.label = label;
-    }
-
-    addInputReason(myEdge) {
-        if (this.relationIn.has(myEdge.reason)) {
-            this.relationIn.get(myEdge.reason).add(myEdge);
-            return;
-        }
-        this.relationIn.set(myEdge.reason, new Set([myEdge]));
-    }
-
-    addOutputEdges(myEdge) {
-        if (this.relationOut.has(myEdge.reason)) {
-            this.relationOut.get(myEdge.reason).add(myEdge);
-            return;
-        }
-        this.relationOut.set(myEdge.reason, new Set([myEdge]));
-    }
-
-    isSuperOutEdge(myEdge) {
-        let xx = this.relationOut.get(myEdge.reason);
-        if (xx && xx.size > 1) {
-            return true;
-        }
-        return false;
-    }
-
-    isSuperInEdge(myEdge) {
-        let xx = this.relationIn.get(myEdge.reason);
-        if (xx && xx.size > 1) {
-            return true;
-        }
-        return false;
+        this.style = style
     }
 }
 
 // 边
 class MyEdge {
-    constructor(from, to, reason, isArrow = false) {
-        this.from = from;
-        this.to = to;
-        this.reason = reason;
-        this.isArrow = isArrow; // 是否有箭头
-        this.id = `${from}-${reason}-${to}`;
+    constructor(fromNode, toNode, label = '', style = edgeStyles.default) {
+        this.fromNode = fromNode;
+        this.toNode = toNode;
+        this.label = label;
+        this.style = style; // 存储边的样式
+        this.id = "edge_" + fromNode.id + "_" + toNode.id
+    }
+}
+
+const MyEdgeLineType = {
+    SOLID: 'solid',
+    DASHED: 'dashed'
+}
+
+class ConceptNodeBase {
+    getId() {
+        return ''
     }
 
-    getSuperInEdgeNodeName() {
-        return this.reason + "_" + this.to;
+    getNodes() {
+        return []
     }
 
-    getSuperOutEdgeNodeName() {
-        return this.from + "_" + this.reason;
+    getEdges() {
+        return []
+    }
+}
+
+class SingleNode extends ConceptNodeBase {
+    constructor(name) {
+        this.name = name || ''
     }
 
-    getSuperInEdgeNode() {
-        return new MyNode(this.getSuperInEdgeNodeName(), this.reason);
+    getId() {
+        return this.name
     }
 
-    getSuperOutEdgeNode() {
-        return new MyNode(this.getSuperOutEdgeNodeName(), this.reason);
+    getNodes() {
+        return [new MyNode({ id: this.getId(), label: this.name, style: nodeStyles.default })]
     }
 
-    getToSuperInEdges() {
-        return [new MyEdge(this.from, this.getSuperInEdgeNodeName(), this.reason, this.isArrow),
-        new MyEdge(this.getSuperInEdgeNodeName(), this.to, this.reason, this.isArrow)
-        ]
+    getEdges() {
+        return []
+    }
+}
+
+class SuperOutNode extends ConceptNodeBase {
+    constructor(left, right, lineType = MyEdgeLineType.SOLID, line = '') {
+        this.left = left || ''
+        this.right = right || ''
+        this.lineType = lineType || MyEdgeLineType.SOLID
+        this.line = line || ''
     }
 
-    getSuperOutEdges() {
-        return [new MyEdge(this.getSuperOutEdgeNodeName(), this.to, this.reason, this.isArrow),
-        new MyEdge(this.from, this.getSuperOutEdgeNodeName(), this.reason, this.isArrow)]
+    getId() {
+        return this.left + "_" + this.right + "_" + this.constructor.name
     }
 
-    isSuperInEdge() {
-        if (graphManager.myNodes.get(this.to)?.isSuperInEdge(this) && this.reason != '') {
-            return true;
+    getNodes() {
+        return [new MyNode( { id: this.left, label: this.left, style: nodeStyles.default }), new MyNode( { id: this.right, label: this.right, style: nodeStyles.superEdge })]
+    }
+
+    getEdges() {
+        return [new MyEdge({ from: this.left, to: this.right, style: edgeStyles.superOutEdge})]
+    }
+}
+
+class SuperInNode extends ConceptNodeBase {
+    constructor(left, right, lineType = MyEdgeLineType.SOLID, line = '') {
+        this.left = left || ''
+        this.right = right || ''
+        this.lineType = lineType || MyEdgeLineType.SOLID
+        this.line = line || ''
+    }
+
+    getId() {
+        return this.left + "_" + this.right + "_" + this.constructor.name
+    }
+
+    getNodes() {
+        return [new MyNode( { id: this.left, label: this.left, style: nodeStyles.superEdge }), new MyNode( { id: this.right, label: this.right, style: nodeStyles.default })]
+    }
+
+    getEdges() {
+        return [new MyEdge({ from: this.left, to: this.right, style: edgeStyles.superInEdge})]
+    }
+}
+
+class RelatioManager {
+    static K_FROM_TO_RELATIONS = []
+    static K_ONE_ONDE = []
+    static K_SUPER_OUT_RELATIONS = new Map()
+    static K_SUPER_IN_RELATIONS = new Map()
+
+    static clear() {
+        this.K_FROM_TO_RELATIONS = []
+        this.K_ONE_ONDE = []
+        this.K_SUPER_IN_RELATIONS.clear()
+        this.K_SUPER_OUT_RELATIONS.clear()
+    }
+
+    static parseRelation(line) {
+        if (line.trim() === '') {
+            return;
         }
-        return false
-    }
 
-    isSuperOutEdge() {
-        if (graphManager.myNodes.get(this.from)?.isSuperOutEdge(this) && this.reason != '') {
-            return true;
+        var from = '';
+        var to = '';
+        var reason = '';;
+
+        var from2ReasonLine = '-'
+        var reason2toLine = '-'
+        var from2toLine = '-'
+        var tos = []; // 用于存储多个to节点
+
+        const regexWithNames = /^(?<fromNode>.+?)(?<from2ReasonLine>-+)(?:(?<reason>.+?)(?<reason2toLine>-+))?(?<isArrow>>?)(?<toNode>.*)$/;
+        const matchResultWithNames = line.match(regexWithNames);
+
+        if (!matchResultWithNames) {
+            console.log("add one onde: " + line.trim() + " to K_ONE_ONDE")
+            this.K_ONE_ONDE.push(new NoRelation(from = line.trim()))
+            return;
         }
+
+        if (matchResultWithNames && matchResultWithNames.groups) {
+            console.log("from2ReasonLine ", matchResultWithNames.groups.from2ReasonLine, "reason2toLine ", matchResultWithNames.groups.reason2toLine);
+
+            from = matchResultWithNames.groups.fromNode.trim();
+            to = matchResultWithNames.groups.toNode?.trim() || '';
+            reason = matchResultWithNames.groups.reason?.trim() || '';
+            from2ReasonLine = matchResultWithNames.groups.from2ReasonLine || '';
+            reason2toLine = matchResultWithNames.groups.reason2toLine || '';
+            from2toLine = matchResultWithNames.groups.toNode;
+        }
+
+        if (to != '' && from != '') {
+            tos = to.split(',').map(node => node.trim()); // 解析多个to节点
+        }
+
+        tos.forEach(subToNode => {
+            if (reason === '') {
+                var tmpRelation = new From2ToRelation(from, subToNode, MyEdgeLineType.SOLID)
+                var tmpRelationLine = from2ReasonLine + reason2toLine
+                if (tmpRelationLine === '-') {
+                    tmpRelation.lineType = MyEdgeLineType.SOLID
+                } else {
+                    tmpRelation.lineType = MyEdgeLineType.DASHED
+                }
+                console.log("add subrelation: " + tmpRelation)
+                this.K_FROM_TO_RELATIONS.push(tmpRelation)
+            } else {
+                var from2ReasonRelation = new From2ReasonRelation(from, reason, MyEdgeLineType.SOLID, line)
+                var reason2toRelation = new Reason2ToRelation(reason, subToNode, MyEdgeLineType.SOLID, line)
+
+                if (from2ReasonLine != '-') {
+                    from2ReasonRelation.lineType = MyEdgeLineType.DASHED
+                }
+
+                if (reason2toLine != '-') {
+                    reason2toRelation.lineType = MyEdgeLineType.DASHED
+                }
+
+                if (!this.K_SUPER_OUT_RELATIONS.has(from2ReasonRelation.getId())) {
+
+                    this.K_SUPER_OUT_RELATIONS.set(from2ReasonRelation.getId(), [reason2toRelation])
+                } else {
+                    this.K_SUPER_OUT_RELATIONS.get(from2ReasonRelation.getId()).push(reason2toRelation)
+                }
+                console.log("add super out relation: " + from2ReasonRelation.getId() + " to " + JSON.stringify(this.K_SUPER_OUT_RELATIONS.get(from2ReasonRelation.getId())))
+
+                if (!this.K_SUPER_IN_RELATIONS.has(reason2toRelation.getId())) {
+                    this.K_SUPER_IN_RELATIONS.set(reason2toRelation.getId(), [from2ReasonRelation])
+                } else {
+                    this.K_SUPER_IN_RELATIONS.get(reason2toRelation.getId()).push(from2ReasonRelation)
+                }
+                console.log("add super in relation: " + reason2toRelation.getId() + " to " + JSON.stringify(this.K_SUPER_IN_RELATIONS.get(reason2toRelation.getId())))
+            }
+        })
     }
 }
 
 class GraphManager {
     constructor() {
-        this.myNodes = new Map();
-        this.myEdges = new Map();
         this.visNetwork = null;
+        this.nodes = new vis.DataSet();
+        this.edges = new vis.DataSet();
     }
 
-    addNode(id, label) {
-        if (!this.myNodes.has(id)) {
-            this.myNodes.set(id, new MyNode(id, label));
+    addNode(myNode) {
+        if (this.nodes.get(myNode.id) == null) {
+            console.log("add node: " + JSON.stringify(myNode))
+            this.nodes.add({
+                id: myNode.id,
+                label: myNode.label, ...myNode.style
+            });
         }
-        return this.myNodes.get(id);
     }
 
-    addEdge(from, to, reason, isArrow = false) {
-        const edgeId = `${from}-${reason}-${to}`;
-        if (!this.myEdges.has(edgeId)) {
-            const edge = new MyEdge(from, to, reason, isArrow);
-            this.myEdges.set(edgeId, edge);
+    addEdge(myEdge) {
+        if (this.edges.get(myEdge.id) == null) {
+            console.log("add edge: " + JSON.stringify(myEdge))
+            this.edges.add({
+                id: myEdge.id,
+                from: myEdge.fromNode.id,
+                to: myEdge.toNode.id, ...myEdge.style
+            });
         }
-        this.myNodes.get(from).addOutputEdges(this.myEdges.get(edgeId));
-        this.myNodes.get(to).addInputReason(this.myEdges.get(edgeId));
-        return this.myEdges.get(edgeId);
-    }
-
-    parseRelation(line) {
-        line = line.trim();
-        if (!line) return null;
-
-        // 解析关系格式：fromNode(-{1,100})(>?)toNode
-        const regexWithNames = /^(?<fromNode>.+?)(-+)(?:(?<reason>.+?)(-+))?(?<isArrow>>?)(?<toNode>.*)$/;
-        const matchResultWithNames = line.match(regexWithNames);
-
-        var retData = null
-        if (!matchResultWithNames) {
-            // 孤立节点
-            retData = {
-                from: line,
-                to: '',
-                isArrow: false
-            };
-        } else {
-            if (matchResultWithNames && matchResultWithNames.groups) {
-                retData = {
-                    from: matchResultWithNames.groups.fromNode.trim(),
-                    to: matchResultWithNames.groups.toNode?.trim() || '',
-                    reason: matchResultWithNames.groups.reason?.trim() || '',
-                    isArrow: matchResultWithNames.groups.isArrow === '>' ? true : false
-                };
-            }
-        }
-
-        console.log("parseRelation retData=", retData)
-        return retData; // 返回解析后的关系对象，或者 null 表示解析失败或不匹配的 forma
     }
 
     updateGraph(text) {
+        this.nodes.clear()
+        this.edges.clear()
+        RelatioManager.clear()
+
         // 过滤掉以#开头的行
         const lines = text.split('\n').filter(line => !line.startsWith('#'));
-        this.myNodes.clear(); // 清空节点
-        this.myEdges.clear(); // 清空边
-
-        // 节点
-        const nodeMap = new Map();
-        // 边
-        const edgeGroups = new Map();
-
         // 解析每行关系
         lines.forEach(line => {
-            const relation = this.parseRelation(line);
-            if (!relation) return;
+            RelatioManager.parseRelation(line);
+        })
 
-            // 初始化节点和边
-            this.addNode(relation.from, relation.from); // 添加from节点
-            if (relation.to) {
-                // to可能是多个节点，用逗号分隔
-                relation.to.split(',').forEach(subToNode => {
-                    this.addNode(subToNode.trim(), subToNode.trim()); // 添加to节点
-                    this.addEdge(relation.from, subToNode.trim(), relation.reason || '', relation.isArrow); // 添加边
-                });
-            }
-        });
-
-
-        const nodes = new vis.DataSet();
-        const edges = new vis.DataSet();
-
-        // 修改节点添加逻辑
-        this.myNodes.forEach(myNode => {
-            if (nodes.get(myNode.id) == null) {
-                nodes.add({
-                    id: myNode.id,
-                    label: myNode.label,
-                    ...nodeStyles.default
-                });
-            }
-        });
-
-        // 添加边
-        this.myEdges.forEach(myEdge => {
-            if (myEdge.isSuperInEdge()) {
-                let xxxnode = myEdge.getSuperInEdgeNode();
-                let [edge0, edge1] = myEdge.getToSuperInEdges();
-                if (nodes.get(xxxnode.id) == undefined) {
-                    nodes.add({ id: xxxnode.id, label: xxxnode.label, ...nodeStyles.superEdge });
-                }
-                if (!edges.get(edge0.id)) {
-                    edges.add({
-                        id: edge0.id,
-                        from: edge0.from,
-                        to: edge0.to,
-                        ...edgeStyles.superInEdge
-                    });
-                }
-                if (!edges.get(edge1.id)) {
-                    edges.add({
-                        id: edge1.id,
-                        from: edge1.from,
-                        to: edge1.to,
-                        ...edgeStyles.default
-                    });
-                }
-                return;
-            }
-
-            if (myEdge.isSuperOutEdge()) {
-                let xxxnode = myEdge.getSuperOutEdgeNode();
-                let [edge0, edge1] = myEdge.getSuperOutEdges();
-                if (nodes.get(xxxnode.id) == undefined) {
-                    nodes.add({
-                        id: xxxnode.id,
-                        label: xxxnode.label,
-                        font: { italic: true },
-                        ...nodeStyles.superEdge
-                    });
-                }
-                if (!edges.get(edge0.id)) {
-                    edges.add({
-                        id: edge0.id,
-                        from: edge0.from,
-                        to: edge0.to,
-                        ...edgeStyles.superOutEdge
-                    });
-                }
-                if (!edges.get(edge1.id)) {
-                    edges.add({
-                        id: edge1.id,
-                        from: edge1.from,
-                        to: edge1.to,
-                        ...edgeStyles.superOutEdgeReverse
-                    });
-                }
-                return;
-            }
-
-            edges.add({
-                id: myEdge.id,
-                from: myEdge.from,
-                to: myEdge.to,
-                label: myEdge.reason,
-                ...edgeStyles.default
+        // 添加节点
+        RelatioManager.K_ONE_ONDE.forEach(relation => {
+            // console.log("relation one : " + JSON.stringify(relation))
+            relation.getNodes().forEach(tmpNode => {
+                this.addNode(tmpNode);
             });
-        });
+        })
+
+        RelatioManager.K_FROM_TO_RELATIONS.forEach(relation => {
+            // console.log("relation only from to : " + JSON.stringify(relation))
+            relation.getNodes().forEach(tmpNode => {
+                this.addNode(tmpNode);
+            });
+            relation.getEdges().forEach(tmpEdge => {
+                // console.log("~~~~  : " + JSON.stringify(tmpEdge))
+                this.addEdge(tmpEdge);
+            })
+        })
+
+        RelatioManager.K_SUPER_OUT_RELATIONS.forEach((relations, key) => {
+            console.log(key + " --> " + JSON.stringify(relations))
+            if (relations.size > 1) {
+                relations.forEach(relation => {
+                    relation.getNodes().forEach(tmpNode => {
+                        this.addNode(tmpNode);
+                    });
+                    relation.getEdges().forEach(tmpEdge => {
+                        this.addEdge(tmpEdge);
+                    })
+                }
+                )
+            }
+        })
+
+        RelatioManager.K_SUPER_IN_RELATIONS.forEach((relations, key) => {
+            console.log(JSON.stringify(relations) + "~~>" + key)
+            if (relations.size > 1) {
+                relations.forEach(relation => {
+                    relation.getNodes().forEach(tmpNode => {
+                        this.addNode(tmpNode);
+                    });
+                    relation.getEdges().forEach(tmpEdge => {
+                        this.addEdge(tmpEdge);
+                    })
+                }
+                )
+            }
+        })
+
 
         // 创建网络
         const container = document.getElementById('network');
-        const data = { nodes, edges };
+        const data = { nodes: this.nodes, edges: this.edges };
+
         const options = {
             nodes: {
                 shape: 'box',
@@ -401,14 +426,14 @@ class GraphManager {
         const savedPositions = localStorage.getItem('nodePositions');
         if (savedPositions) {
             const positions = JSON.parse(savedPositions);
-            nodes.forEach(node => {
+            this.nodes.forEach(node => {
                 if (positions[node.id]) {
                     node.x = positions[node.id].x;
                     node.y = positions[node.id].y;
                     node.fixed = false; // 固定位置
                 }
             });
-            this.visNetwork.setData({ nodes, edges });
+            this.visNetwork.setData({ nodes: this.nodes, edges: this.edges });
         }
     }
 
