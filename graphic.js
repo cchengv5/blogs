@@ -100,7 +100,7 @@ class MyEdge {
         this.toNode = toNode;
         this.label = label;
         this.style = style; // 存储边的样式
-        this.id = "edge_" + fromNode.id + "_" + toNode.id
+        this.id = "edge_" + fromNode + "_" + toNode
     }
 }
 
@@ -109,91 +109,144 @@ const MyEdgeLineType = {
     DASHED: 'dashed'
 }
 
-class ConceptNodeBase {
+class RelationBase {
+    constructor(left, right, lineType = MyEdgeLineType.SOLID) {
+        this.left = left || ''
+        this.right = right || ''
+        this.lineType = lineType || MyEdgeLineType.SOLID
+        this.count = 1
+    }
+
     getId() {
-        return ''
+        return this.left + "_" + this.right + "_" + this.constructor.name
     }
 
-    getNodes() {
-        return []
+    incCount() {
+        this.count++
     }
 
-    getEdges() {
-        return []
+    getCount() {
+        return this.count
     }
 }
 
-class SingleNode extends ConceptNodeBase {
-    constructor(name) {
+class From2ToRelation extends RelationBase {
+    constructor(left, right, lineType = MyEdgeLineType.SOLID) {
+        super(left, right, lineType)
+    }
+
+    getId() {
+        return this.left + "_" + this.right + "_" + this.constructor.name
+    }
+}
+
+class From2ReasonRelation extends RelationBase {
+    constructor(left, right, lineType = MyEdgeLineType.SOLID, line = '') {
+        super(left, right, lineType)
+        this.line = line || ''
+    }
+
+    getId() {
+        return this.left + "_" + this.right + "_" + this.constructor.name
+    }
+}
+
+class Reason2ToRelation extends RelationBase {
+    constructor(left, right, lineType = MyEdgeLineType.SOLID, line = '') {
+        super(left, right, lineType)
+        this.line = line || ''
+    }
+
+    getId() {
+        return this.left + "_" + this.right + "_" + this.constructor.name
+    }
+}
+
+class NormalNode {
+    constructor(name, relationLeft = '', relationRight = '') {
         this.name = name || ''
+        this.relationLeft = relationLeft || ''
+        this.relationRight = relationRight || ''
     }
 
     getId() {
         return this.name
     }
 
-    getNodes() {
-        return [new MyNode({ id: this.getId(), label: this.name, style: nodeStyles.default })]
+    getNodeStyle() {
+        return nodeStyles.default
     }
 
-    getEdges() {
-        return []
-    }
-}
-
-class SuperOutNode extends ConceptNodeBase {
-    constructor(left, right, lineType = MyEdgeLineType.SOLID, line = '') {
-        this.left = left || ''
-        this.right = right || ''
-        this.lineType = lineType || MyEdgeLineType.SOLID
-        this.line = line || ''
+    getFixedNodeId() {
+        return this.name
     }
 
-    getId() {
-        return this.left + "_" + this.right + "_" + this.constructor.name
-    }
-
-    getNodes() {
-        return [new MyNode( { id: this.left, label: this.left, style: nodeStyles.default }), new MyNode( { id: this.right, label: this.right, style: nodeStyles.superEdge })]
-    }
-
-    getEdges() {
-        return [new MyEdge({ from: this.left, to: this.right, style: edgeStyles.superOutEdge})]
+    getLabel() {
+        return this.name
     }
 }
 
-class SuperInNode extends ConceptNodeBase {
-    constructor(left, right, lineType = MyEdgeLineType.SOLID, line = '') {
-        this.left = left || ''
-        this.right = right || ''
-        this.lineType = lineType || MyEdgeLineType.SOLID
-        this.line = line || ''
+class ReaonNode extends NormalNode {
+    constructor(name, relationLeft, relationRight) {
+        super(name, relationLeft, relationRight)
     }
 
     getId() {
-        return this.left + "_" + this.right + "_" + this.constructor.name
+        return this.name + "_" + this.relationLeft + "_" + this.relationRight + "_" + this.constructor.name
     }
 
-    getNodes() {
-        return [new MyNode( { id: this.left, label: this.left, style: nodeStyles.superEdge }), new MyNode( { id: this.right, label: this.right, style: nodeStyles.default })]
+    getNodeStyle() {
+        return nodeStyles.superEdge
     }
 
-    getEdges() {
-        return [new MyEdge({ from: this.left, to: this.right, style: edgeStyles.superInEdge})]
+    getFixedNodeId() {
+        let relationLeftrr = RelatioManager.K_RELATIONS_COUNT.get(this.relationLeft)
+        if (relationLeftrr && relationLeftrr.getCount() > 1) {
+            // console.log("relationLeftrr: " + JSON.stringify(relationLeftrr))
+            return relationLeftrr.getId()
+        }
+        let relationRightrr = RelatioManager.K_RELATIONS_COUNT.get(this.relationRight)
+        if (relationRightrr && relationRightrr.getCount() > 1) {
+            return relationRightrr.getId()
+        }
+        return this.name
     }
 }
 
 class RelatioManager {
-    static K_FROM_TO_RELATIONS = []
-    static K_ONE_ONDE = []
-    static K_SUPER_OUT_RELATIONS = new Map()
-    static K_SUPER_IN_RELATIONS = new Map()
+    static K_SPLITTER_IN_NODES = '||'
+    static K_SPLITTER_BETWEEN_NODES = '-'
+    static K_REASON_SUFFIX_AND_PREFIX = '_'
+
+    static K_RELATIONS_COUNT = new Map()
+    static K_NODES = new Map()
 
     static clear() {
-        this.K_FROM_TO_RELATIONS = []
-        this.K_ONE_ONDE = []
-        this.K_SUPER_IN_RELATIONS.clear()
-        this.K_SUPER_OUT_RELATIONS.clear()
+        RelatioManager.K_RELATIONS_COUNT.clear()
+        RelatioManager.K_NODES.clear()
+    }
+
+    static extractNodeNames(str) {
+        return str.split(this.K_SPLITTER_IN_NODES).map(node => node.trim());
+    }
+
+    static addRelation(relation) {
+        const key = relation.getId();
+        if (RelatioManager.K_RELATIONS_COUNT.has(key)) {
+            RelatioManager.K_RELATIONS_COUNT.get(key).incCount();
+        } else {
+            RelatioManager.K_RELATIONS_COUNT.set(key, relation);
+        }
+    }
+
+    static addNode(node) {
+        const key = node.getId();
+        // console.log("add node: " + key)
+        if (!RelatioManager.K_NODES.has(key)) {
+            RelatioManager.K_NODES.set(key, node);
+            // console.log([...RelatioManager.K_NODES])
+            // console.log("add node~~: " + JSON.stringify(RelatioManager.K_NODES))
+        }
     }
 
     static parseRelation(line) {
@@ -201,78 +254,52 @@ class RelatioManager {
             return;
         }
 
-        var from = '';
-        var to = '';
-        var reason = '';;
+        var fromNodess = []
+        var reasonNodes = []
+        var toNodes = []
 
-        var from2ReasonLine = '-'
-        var reason2toLine = '-'
-        var from2toLine = '-'
-        var tos = []; // 用于存储多个to节点
-
-        const regexWithNames = /^(?<fromNode>.+?)(?<from2ReasonLine>-+)(?:(?<reason>.+?)(?<reason2toLine>-+))?(?<isArrow>>?)(?<toNode>.*)$/;
-        const matchResultWithNames = line.match(regexWithNames);
-
-        if (!matchResultWithNames) {
-            console.log("add one onde: " + line.trim() + " to K_ONE_ONDE")
-            this.K_ONE_ONDE.push(new NoRelation(from = line.trim()))
-            return;
+        let parts = line.split('-').map(part => part.trim()).filter(item => item.trim() !== '');
+        if (parts.length >= 1) {
+            fromNodess = this.extractNodeNames(parts[0])
+        }
+        if (parts.length == 2) {
+            toNodes = this.extractNodeNames(parts[1])
+        } else if (parts.length == 3) {
+            reasonNodes = this.extractNodeNames(parts[1])
+            toNodes = this.extractNodeNames(parts[2])
         }
 
-        if (matchResultWithNames && matchResultWithNames.groups) {
-            console.log("from2ReasonLine ", matchResultWithNames.groups.from2ReasonLine, "reason2toLine ", matchResultWithNames.groups.reason2toLine);
+        // console.log("fromNodess: " + JSON.stringify(fromNodess))
+        // console.log("reasonNodes: " + JSON.stringify(reasonNodes))
+        // console.log("toNodes: " + JSON.stringify(toNodes))
+        // console.log("parts: " + JSON.stringify(parts))
 
-            from = matchResultWithNames.groups.fromNode.trim();
-            to = matchResultWithNames.groups.toNode?.trim() || '';
-            reason = matchResultWithNames.groups.reason?.trim() || '';
-            from2ReasonLine = matchResultWithNames.groups.from2ReasonLine || '';
-            reason2toLine = matchResultWithNames.groups.reason2toLine || '';
-            from2toLine = matchResultWithNames.groups.toNode;
-        }
+        fromNodess.forEach(fromNode => {
+            this.addNode(new NormalNode(fromNode))
+            // console.log("add node~~!!!: " + JSON.stringify(RelatioManager.K_NODES))
 
-        if (to != '' && from != '') {
-            tos = to.split(',').map(node => node.trim()); // 解析多个to节点
-        }
+            toNodes.forEach(toNode => {
+                this.addNode(new NormalNode(toNode))
+                // console.log("add node~~!!!: " + JSON.stringify(RelatioManager.K_NODES))
 
-        tos.forEach(subToNode => {
-            if (reason === '') {
-                var tmpRelation = new From2ToRelation(from, subToNode, MyEdgeLineType.SOLID)
-                var tmpRelationLine = from2ReasonLine + reason2toLine
-                if (tmpRelationLine === '-') {
-                    tmpRelation.lineType = MyEdgeLineType.SOLID
-                } else {
-                    tmpRelation.lineType = MyEdgeLineType.DASHED
-                }
-                console.log("add subrelation: " + tmpRelation)
-                this.K_FROM_TO_RELATIONS.push(tmpRelation)
-            } else {
-                var from2ReasonRelation = new From2ReasonRelation(from, reason, MyEdgeLineType.SOLID, line)
-                var reason2toRelation = new Reason2ToRelation(reason, subToNode, MyEdgeLineType.SOLID, line)
-
-                if (from2ReasonLine != '-') {
-                    from2ReasonRelation.lineType = MyEdgeLineType.DASHED
+                if (reasonNodes.length == 0) {
+                    var from2toRelation = new From2ToRelation(fromNode, toNode, MyEdgeLineType.SOLID)
+                    this.addRelation(from2toRelation)
+                    return
                 }
 
-                if (reason2toLine != '-') {
-                    reason2toRelation.lineType = MyEdgeLineType.DASHED
-                }
+                reasonNodes.forEach(reasonNode => {
+                    var from2ReasonRelation = new From2ReasonRelation(fromNode, reasonNode, MyEdgeLineType.SOLID, line)
+                    var reason2toRelation = new Reason2ToRelation(reasonNode, toNode, MyEdgeLineType.SOLID, line)
+                    this.addRelation(from2ReasonRelation)
+                    this.addRelation(reason2toRelation)
 
-                if (!this.K_SUPER_OUT_RELATIONS.has(from2ReasonRelation.getId())) {
-
-                    this.K_SUPER_OUT_RELATIONS.set(from2ReasonRelation.getId(), [reason2toRelation])
-                } else {
-                    this.K_SUPER_OUT_RELATIONS.get(from2ReasonRelation.getId()).push(reason2toRelation)
-                }
-                console.log("add super out relation: " + from2ReasonRelation.getId() + " to " + JSON.stringify(this.K_SUPER_OUT_RELATIONS.get(from2ReasonRelation.getId())))
-
-                if (!this.K_SUPER_IN_RELATIONS.has(reason2toRelation.getId())) {
-                    this.K_SUPER_IN_RELATIONS.set(reason2toRelation.getId(), [from2ReasonRelation])
-                } else {
-                    this.K_SUPER_IN_RELATIONS.get(reason2toRelation.getId()).push(from2ReasonRelation)
-                }
-                console.log("add super in relation: " + reason2toRelation.getId() + " to " + JSON.stringify(this.K_SUPER_IN_RELATIONS.get(reason2toRelation.getId())))
-            }
+                    this.addNode(new ReaonNode(reasonNode, from2ReasonRelation.getId(), reason2toRelation.getId()))
+                })
+            })
         })
+
+        // console.log("add node~~!!!: " + JSON.stringify(RelatioManager.K_NODES))
     }
 }
 
@@ -284,22 +311,23 @@ class GraphManager {
     }
 
     addNode(myNode) {
-        if (this.nodes.get(myNode.id) == null) {
-            console.log("add node: " + JSON.stringify(myNode))
+        console.log("add node: " + JSON.stringify(myNode))
+
+        if (this.nodes.get(myNode.getFixedNodeId()) == null) {
             this.nodes.add({
-                id: myNode.id,
-                label: myNode.label, ...myNode.style
+                id: myNode.getFixedNodeId(),
+                label: myNode.getLabel(), ...myNode.getNodeStyle()
             });
         }
     }
 
     addEdge(myEdge) {
-        if (this.edges.get(myEdge.id) == null) {
+        if (this.edges.get(myEdge?.id) == null) {
             console.log("add edge: " + JSON.stringify(myEdge))
             this.edges.add({
                 id: myEdge.id,
-                from: myEdge.fromNode.id,
-                to: myEdge.toNode.id, ...myEdge.style
+                from: myEdge.fromNode,
+                to: myEdge.toNode, ...myEdge.style
             });
         }
     }
@@ -316,55 +344,51 @@ class GraphManager {
             RelatioManager.parseRelation(line);
         })
 
+        // console.log("relations count: " + JSON.stringify(RelatioManager.K_RELATIONS_COUNT))
+        console.log([...RelatioManager.K_RELATIONS_COUNT])
+
         // 添加节点
-        RelatioManager.K_ONE_ONDE.forEach(relation => {
-            // console.log("relation one : " + JSON.stringify(relation))
-            relation.getNodes().forEach(tmpNode => {
-                this.addNode(tmpNode);
-            });
+        RelatioManager.K_NODES.forEach((node, id) => {
+            this.addNode(node);
         })
 
-        RelatioManager.K_FROM_TO_RELATIONS.forEach(relation => {
-            // console.log("relation only from to : " + JSON.stringify(relation))
-            relation.getNodes().forEach(tmpNode => {
-                this.addNode(tmpNode);
-            });
-            relation.getEdges().forEach(tmpEdge => {
-                // console.log("~~~~  : " + JSON.stringify(tmpEdge))
-                this.addEdge(tmpEdge);
-            })
-        })
+        RelatioManager.K_NODES.forEach((node, id) => {
+            if (node instanceof ReaonNode) {
+                let relationLeft = RelatioManager.K_RELATIONS_COUNT.get(node.relationLeft)
+                let relationRight = RelatioManager.K_RELATIONS_COUNT.get(node.relationRight)
 
-        RelatioManager.K_SUPER_OUT_RELATIONS.forEach((relations, key) => {
-            console.log(key + " --> " + JSON.stringify(relations))
-            if (relations.size > 1) {
-                relations.forEach(relation => {
-                    relation.getNodes().forEach(tmpNode => {
-                        this.addNode(tmpNode);
-                    });
-                    relation.getEdges().forEach(tmpEdge => {
-                        this.addEdge(tmpEdge);
-                    })
+                console.log("relationLeft: " + JSON.stringify(relationLeft) + "~~" + relationLeft?.left)
+                console.log("relationRight: " + JSON.stringify(relationRight))
+                if (relationLeft && relationLeft?.left) {
+                    this.addEdge(new MyEdge(
+                        relationLeft?.left || '',
+                        node.getFixedNodeId(),
+                        '',
+                        edgeStyles.superInEdge
+                    ));
                 }
-                )
+
+                if (relationRight && relationRight?.right) {
+                    this.addEdge(new MyEdge(
+                        node.getFixedNodeId(),
+                        relationRight?.right || '',
+                        '',
+                        edgeStyles.superOutEdge
+                    ));
+                }
             }
         })
 
-        RelatioManager.K_SUPER_IN_RELATIONS.forEach((relations, key) => {
-            console.log(JSON.stringify(relations) + "~~>" + key)
-            if (relations.size > 1) {
-                relations.forEach(relation => {
-                    relation.getNodes().forEach(tmpNode => {
-                        this.addNode(tmpNode);
-                    });
-                    relation.getEdges().forEach(tmpEdge => {
-                        this.addEdge(tmpEdge);
-                    })
-                }
-                )
+        RelatioManager.K_RELATIONS_COUNT.forEach((relation, relatioName) => {
+            if (relation instanceof From2ToRelation) {
+                this.addEdge(new MyEdge(
+                    relation.left,
+                    relation.right,
+                    '',
+                    edgeStyles.default
+                ));
             }
         })
-
 
         // 创建网络
         const container = document.getElementById('network');
